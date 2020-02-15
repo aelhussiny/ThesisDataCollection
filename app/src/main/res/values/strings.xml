@@ -1,0 +1,49 @@
+<resources>
+    <string name="app_name">Ahmed ElHussiny Data Collector</string>
+    <string name="title_activity_consent">Consent Form</string>
+    <string name="consent_text">You are being asked to participate in a research study. The purpose of the research is to profile users based on their cellphone use, and the findings may be published and presented. The expected duration of your participation is one month.\nThe procedures of the research will be as follows: installing an application on your phone to collect zero-permission sensor usage, followed by a phase of machine learning performed on this data, and an analysis phase. The data from the sensors will be stored locally on your device. After your period of participation (30 days), you will be required to share the readings with the principal investigator. Upon completing this step, you may uninstall the application from your phone.\nThere will not be certain risks or discomforts associated with this research.\nThere will not be immediate benefits to you from this research, however this research may be used in the future to better personalize application content to your specific gender and age-group.\nThe information you provide for purposes of this research is anonymous. We will only label your data by your gender and age-group, but not by any other means of identification.\nQuestions about the research or your rights should be directed to Ahmed ElHussiny at aelhussiny@aucegypt.edu.\nParticipation in this study is voluntary. Refusal to participate will involve no penalty or loss of benefits to which you are otherwise entitled. You may discontinue participation at any time without penalty or the loss of benefits to which you are otherwise entitled.\nYour continuation of keeping this application installed on your phone is implicit acceptance of the terms listed above.
+</string>
+    <string name="sharedPreferencesFile">edu.aucegypt.AEDataCollector.sharedPref</string>
+    <string name="consentAcceptanceKey">consent_acceptance</string>
+    <string name="YourName">Full Name</string>
+    <string name="accept">Accept</string>
+    <string name="cancel">Cancel</string>
+    <string name="consentName">consentName</string>
+    <string name="consentDate">consentDate</string>
+    <string name="enterFullName">Enter Full Name</string>
+    <string name="agreement">I Agree to the Terms</string>
+    <string name="enterSignature">Sign Your Name</string>
+    <string name="please">Please</string>
+    <string name="consentSignature">consentSignature</string>
+    <string name="projectInfo">"<b>"Project Title:"</b>" User Profiling through Zero-Permission Sensors and Machine Learning\n"<b>"Principal Investigator:"</b>" Ahmed ElHussiny, "<a href='mailto:aelhussiny@aucegypt.edu'>"aelhussiny@aucegypt.edu"</a>"</string>
+    <string name="DocumentationTitle">Documentation of Informed Consent for Participation in Research Study</string>
+    <string name="title_activity_register">Registration</string>
+    <string name="hi">Hi!</string>
+    <string name="instructions">Before we get started, we need some basic information from you</string>
+    <string name="Under20"><![CDATA[< 20]]></string>
+    <string name="Twenties">20 - 29</string>
+    <string name="Thirties">30 - 39</string>
+    <string name="Forties">40 - 49</string>
+    <string name="Male">Male</string>
+    <string name="Female">Female</string>
+    <string name="AgeGroup">Age Group</string>
+    <string name="Gender">Gender</string>
+    <string name="selectGender">Select a Gender</string>
+    <string name="selectAgeGroup">Select an Age Group</string>
+    <string name="accelerometerID">1</string>
+    <string name="accelerometerName">Accelerometer</string>
+    <string name="gyroscopeID">2</string>
+    <string name="gyroscopeName">Gyroscope</string>
+    <string name="lightSensorID">3</string>
+    <string name="lightSensorName">Ambient Light</string>
+    <string name="significantMotionSensorID">4</string>
+    <string name="significantMotionSensorName">Significant Motion</string>
+    <string name="stationarySensorID">5</string>
+    <string name="stationarySensorName">Stationary</string>
+    <string name="stepSensorID">6</string>
+    <string name="stepSensorName">Step</string>
+    <string name="lastCollection">Last Collected At:</string>
+    <string name="never">Never</string>
+    <string name="thanks">Thank you for supporting my research</string>
+    <string name="share_database">Share Database</string>
+</resources>
