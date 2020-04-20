@@ -1,33 +1,40 @@
 package edu.aucegypt.AEdatacollector;
 
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
-import androidx.core.app.ActivityCompat;
-
 import android.Manifest;
 import android.app.Activity;
 import android.app.ActivityManager;
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-import android.hardware.Sensor;
-import android.hardware.SensorManager;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.ActivityCompat;
+import androidx.core.app.ShareCompat;
+import androidx.core.content.FileProvider;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -38,9 +45,14 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
+
+    ProgressDialog pd;
+    SQLiteDatabase db;
+    Handler mHandler;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -50,9 +62,7 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-        CreationAsyncTask creationTask = new CreationAsyncTask();
-
-        SQLiteDatabase db = (new DatabaseHelper(getApplicationContext())).getReadableDatabase();
+        db = (new DatabaseHelper(MainActivity.this)).getReadableDatabase();
         String[] columns = {UserDataContract.UserData.COLUMN_NAME_KEY};
         Cursor cursor = db.query(UserDataContract.UserData.TABLE_NAME, columns, null, null, null, null, null);
         HashSet<String> requiredKeys = new HashSet<String>(Arrays.asList("name", "consentDate", "signature", "gender", "ageGroup"));
@@ -66,7 +76,34 @@ public class MainActivity extends AppCompatActivity {
         if(!requiredKeys.equals(foundKeys)) {
             backToRegistration();
         } else {
-            creationTask.execute("");
+            pd = new ProgressDialog(MainActivity.this);
+            pd.setMessage("Please Wait");
+            pd.setCancelable(false);
+            mHandler = new Handler(Looper.getMainLooper()) {
+                @Override
+                public void handleMessage(Message message) {
+                    switch (message.what) {
+                        case 1:
+                            pd.setIndeterminate(true);
+                            pd.show();
+                            break;
+                        case 2:
+                            pd.setIndeterminate(false);
+                            pd.dismiss();
+                            break;
+                        case 3:
+                            pd.setMax(message.arg1);
+                            break;
+                        case 4:
+                            pd.setProgress(message.arg1);
+                    }
+                }
+            };
+            if(checkPermissions()) {
+                executeCreationTask();
+            } else {
+                requestMainPermissions();
+            }
             findViewById(R.id.share_btn).setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -74,12 +111,7 @@ public class MainActivity extends AppCompatActivity {
                     try {
                         verifyStoragePermissions(MainActivity.this);
                         if(PackageManager.PERMISSION_GRANTED == ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
-                            Intent shareIntent = new Intent();
-                            shareIntent.setAction(Intent.ACTION_SEND);
-                            shareIntent.putExtra(Intent.EXTRA_STREAM, getDBCopyUri());
-                            shareIntent.setType("application/x-sqlite3");
-                            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                            startActivity(Intent.createChooser(shareIntent, "Share Sensor Data"));
+                            createAndShareDBCopy();
                         }
                     } catch (Exception e) {
                         Log.e("AhmedTest", "Error:", e);
@@ -89,6 +121,57 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
+    }
+
+    private void requestMainPermissions() {
+        ArrayList<String> neededPermissions = new ArrayList<String>();
+        neededPermissions.add(Manifest.permission.RECEIVE_BOOT_COMPLETED);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            neededPermissions.add(Manifest.permission.FOREGROUND_SERVICE);
+        }
+        ActivityCompat.requestPermissions(this, neededPermissions.toArray(new String[neededPermissions.size()]), 1);
+    }
+
+    private boolean checkPermissions() {
+        boolean granted = true;
+        granted = granted && ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.RECEIVE_BOOT_COMPLETED) == PackageManager.PERMISSION_GRANTED;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            granted = granted && ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.FOREGROUND_SERVICE) == PackageManager.PERMISSION_GRANTED;
+        }
+        return granted;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (Arrays.binarySearch(grantResults, -1) >= 0 || grantResults.length == 0) {
+            if (requestCode == 1) {
+                Toast.makeText(MainActivity.this, "Application cannot proceed without correct permissions", Toast.LENGTH_LONG).show();
+                requestMainPermissions();
+            } else if (requestCode == 2) {
+                Toast.makeText(MainActivity.this, "Cannot share database without files permission", Toast.LENGTH_LONG).show();
+            }
+        } else {
+            if (requestCode == 1) {
+                executeCreationTask();
+            } else if (requestCode == 2) {
+                try {
+                    createAndShareDBCopy();
+                } catch (Exception e) {
+                    Log.e("AhmedTest", "Error:", e);
+                    Toast.makeText(getApplicationContext(), "Error encountered", Toast.LENGTH_LONG).show();
+                }
+            }
+        }
+    }
+
+    private void createAndShareDBCopy() throws Exception {
+        startDBCopy();
+    }
+
+    private void executeCreationTask() {
+        pd.show();
+        (new CreationAsyncTask()).execute("");
     }
 
     public static void verifyStoragePermissions(Activity activity) {
@@ -102,39 +185,26 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(
                     activity,
                     PERMISSIONS_STORAGE,
-                    1
+                    2
             );
         }
     }
 
-    private Uri getDBCopyUri() throws Exception {
+    private void startDBCopy() throws Exception {
         File file = getApplicationContext().getDatabasePath(DatabaseHelper.DATABASE_NAME);
 
         if(file.exists() && file.canRead())
         {
-            File destination = new File(Environment.getExternalStorageDirectory() + "/" + getPackageName(), "database_copy.db");
+            File destination = new File(this.getExternalFilesDir(null), "database_copy_" + (new Date()).getTime() + ".db");
             if (!destination.exists()) {
-                destination.getParentFile().mkdirs();
+                boolean result = destination.getParentFile().mkdirs();
                 destination.createNewFile();
             }
-            copy(file, destination);
-            return Uri.fromFile(destination);
+            CopyAsyncTask copyTask = new CopyAsyncTask();
+            copyTask.execute(file, destination);
         } else {
             throw new Exception("File inaccessible");
         }
-    }
-
-    private void copy(File src, File dst) throws IOException {
-        InputStream in = new FileInputStream(src);
-        OutputStream out = new FileOutputStream(dst, false);
-
-        byte[] buf = new byte[1024];
-        int len;
-        while ((len = in.read(buf)) > 0) {
-            out.write(buf, 0, len);
-        }
-        in.close();
-        out.close();
     }
 
     private void backToRegistration() {
@@ -156,10 +226,6 @@ public class MainActivity extends AppCompatActivity {
                 latestCollectionTextView = (TextView) findViewById(R.id.gyroscopeLastCollection);
             } else if (sensorID.equals(getString(R.string.lightSensorID))) {
                 latestCollectionTextView = (TextView) findViewById(R.id.lightLastCollection);
-            } else if (sensorID.equals(getString(R.string.stationarySensorID))) {
-                latestCollectionTextView = (TextView) findViewById(R.id.stationaryLastCollection);
-            } else if (sensorID.equals(getString(R.string.significantMotionSensorID))) {
-                latestCollectionTextView = (TextView) findViewById(R.id.sigMotionLastCollection);
             }
 
             if (latestCollectionTextView != null) {
@@ -175,91 +241,104 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void allowSharing() {
-        findViewById(R.id.share_btn).setVisibility(View.VISIBLE);
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        db.close();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        try {
+            executeCreationTask();
+        } catch (Exception e) {
+            Log.e("AhmedTest", "Error executing creation task", e);
+        }
+    }
+
+    protected void fileCopyFinished(File destination) {
+        Uri destinationUri = FileProvider.getUriForFile(
+                MainActivity.this, getApplicationContext().getPackageName() + ".provider", destination);
+        Intent shareIntent = ShareCompat.IntentBuilder.from(this)
+                .setStream(destinationUri)
+                .setType("application/x-sqlite3")
+                .setChooserTitle("Share Sensor Data")
+                .getIntent();
+        shareIntent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivity(Intent.createChooser(shareIntent, "Share Sensor Data"));
     }
 
     private class CreationAsyncTask extends AsyncTask {
 
+
         HashMap<String, Long> lastAt = new HashMap<>();
         ArrayList<View> views = new ArrayList<View>();
-        boolean showShare = true;
+        boolean showShare = false;
+
+        public CreationAsyncTask() {
+
+        }
 
         @Override
         protected Object doInBackground(Object[] objects) {
-            SQLiteDatabase db = (new DatabaseHelper(getApplicationContext())).getReadableDatabase();
-            String latestQuery = "SELECT " + SensorDataContract.SensorData.COLUMN_NAME_SENSOR + ", MAX(" + SensorDataContract.SensorData.COLUMN_NAME_TIME + ") AS " + SensorDataContract.SensorData.COLUMN_NAME_TIME + " FROM " +
-                    SensorDataContract.SensorData.TABLE_NAME + " GROUP BY " + SensorDataContract.SensorData.COLUMN_NAME_SENSOR;
-            final Cursor latestCollectionCursor = db.rawQuery(latestQuery, null);
+            SharedPreferences sharedPreferences = getSharedPreferences(getString(R.string.sharedPreferencesFile), Context.MODE_PRIVATE);
+            Log.d("AhmedTest", "Starting doInBackground");
 
-            while (latestCollectionCursor.moveToNext()) {
-                String sensor = latestCollectionCursor.getString(latestCollectionCursor.getColumnIndex(SensorDataContract.SensorData.COLUMN_NAME_SENSOR));
-                long time = latestCollectionCursor.getLong(latestCollectionCursor.getColumnIndex(SensorDataContract.SensorData.COLUMN_NAME_TIME));
-                lastAt.put(sensor, time);
+            String[] sensors = {getString(R.string.accelerometerID), getString(R.string.gyroscopeID), getString(R.string.lightSensorID)};
+            for (String sensor: sensors) {
+                String lastReading = sharedPreferences.getString("lastReadingFor" + sensor, "");
+                if (lastReading.length() > 0) {
+                    long time = Long.parseLong(lastReading.substring(0, lastReading.indexOf(("_"))));
+                    lastAt.put(sensor, time);
+                }
             }
-            latestCollectionCursor.close();
 
-            String twoWeeksQuery = "SELECT MIN(" + SensorDataContract.SensorData.COLUMN_NAME_TIME + ") AS minimum, MAX(" + SensorDataContract.SensorData.COLUMN_NAME_TIME + ") AS maximum FROM " + SensorDataContract.SensorData.TABLE_NAME;
-            final Cursor twoWeeksCursor = db.rawQuery(twoWeeksQuery, null);
+            Log.d("AhmedTest", "Done with latestQuery");
 
-            if(twoWeeksCursor.moveToFirst()) {
-                long minimum = twoWeeksCursor.getLong(0);
-                long maximum = twoWeeksCursor.getLong(1);
-                if (maximum - minimum >= (2 * 7 * 24 * 60 * 60 * 1000)) {
-                    showShare = true;
+            PowerManager powerManager = (PowerManager) getApplicationContext().getSystemService(POWER_SERVICE);
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                Intent i = new Intent();
+                if (!powerManager.isIgnoringBatteryOptimizations(getPackageName())) {
+                    i.setAction(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                    i.setData(Uri.parse("package:" + getPackageName()));
+                    startActivity(i);
                 }
             }
 
 
-            db.close();
+            if(!serviceIsRunning(SensorService.class)) {
+                Intent sensorServiceIntent = new Intent(MainActivity.this, SensorService.class);
 
-
-
-            SensorManager sensorManager = (SensorManager)getSystemService(Context.SENSOR_SERVICE);
-            if(sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null) {
-                startService(new Intent(MainActivity.this, AccelerometerService.class));
-            } else {
-                Log.d("AhmedTest", "No Accelerometer Found");
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(sensorServiceIntent);
+                } else {
+                    startService(sensorServiceIntent);
+                }
             }
 
-            if(sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE) != null) {
-                startService(new Intent(MainActivity.this, GyroscopeService.class));
-            } else {
-                Log.d("AhmedTest", "No Gyroscope Found");
+            Log.d("AhmedTest", "Done with Service Starting");
+
+            try {
+                Thread.sleep(1000);
+            } catch (Exception e) {
+                Log.e("AhmedTest", "Thread Sleep Error", e);
             }
 
-            if(sensorManager.getDefaultSensor(Sensor.TYPE_LIGHT) != null) {
-                startService(new Intent(MainActivity.this, LightService.class));
-            } else {
-                Log.d("AhmedTest", "No Light Sensor Found");
-            }
+            Log.d("AhmedTest", "Done with waiting for service starting");
 
-            if(sensorManager.getDefaultSensor(Sensor.TYPE_STATIONARY_DETECT) != null) {
-                startService(new Intent(MainActivity.this, StationaryService.class));
-            } else {
-                Log.d("AhmedTest", "No Stationary Sensor Found");
-            }
-
-            if(sensorManager.getDefaultSensor(Sensor.TYPE_SIGNIFICANT_MOTION) != null) {
-                startService(new Intent(MainActivity.this, SigMotionService.class));
-            } else {
-                Log.d("AhmedTest", "No SigMotion Sensor Found");
-            }
-
-            Class[] serviceClasses = {AccelerometerService.class, GyroscopeService.class, LightService.class, StationaryService.class, SigMotionService.class};
-            for (Class service: serviceClasses) {
-                if (serviceIsRunning(service)) {
+            SensorService service = SensorService.getInstance();
+            if (service != null) {
+                Iterator<String> monitoredSensorsIterator = service.getMonitoredSensors().iterator();
+                while (monitoredSensorsIterator.hasNext()) {
+                    String sensor = monitoredSensorsIterator.next();
                     View statusView = null;
-                    if (service.getName().equals("edu.aucegypt.AEdatacollector.AccelerometerService")) {
+                    if (sensor.equals(getString(R.string.accelerometerID))) {
                         statusView = findViewById(R.id.accelerometerStatusView);
-                    } else if (service.getName().equals("edu.aucegypt.AEdatacollector.GyroscopeService")) {
+                    } else if (sensor.equals(getString(R.string.gyroscopeID))) {
                         statusView = findViewById(R.id.gyroscopeStatusView);
-                    } else if (service.getName().equals("edu.aucegypt.AEdatacollector.LightService")) {
+                    } else if (sensor.equals(getString(R.string.lightSensorID))) {
                         statusView = findViewById(R.id.lightStatusView);
-                    } else if (service.getName().equals("edu.aucegypt.AEdatacollector.StationaryService")) {
-                        statusView = findViewById(R.id.stationaryStatusView);
-                    } else if (service.getName().equals("edu.aucegypt.AEdatacollector.SigMotionService")) {
-                        statusView = findViewById(R.id.sigMotionStatusView);
                     }
 
                     if (statusView != null) {
@@ -268,32 +347,83 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
 
+            Log.d("AhmedTest", "Done with checking monitored sensors");
 
             return null;
         }
 
         @Override
         protected void onPostExecute(Object o) {
+            Log.d("AhmedTest", "Starting PostExecute");
             updateTimeForSensor(lastAt);
             updateSensorStatus(views);
-            if (showShare) {
-                allowSharing();
-            }
+            pd.dismiss();
+            Log.d("AhmedTest", "Finishing PostExecute");
         }
 
         private boolean serviceIsRunning(Class<?> serviceClass) {
+            Log.d("AhmedTest", "Starting serviceIsRunning");
             try {
                 ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
                 for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
                     if (serviceClass.getName().equals(service.service.getClassName())) {
+                        Log.d("AhmedTest", "Ending serviceIsRunning");
                         return true;
                     }
                 }
+                Log.d("AhmedTest", "Ending serviceIsRunning");
                 return false;
             } catch (NullPointerException npe) {
+                Log.d("AhmedTest", "Ending serviceIsRunning");
                 Log.e("AhmedTest", "Couldn't get running services", npe);
                 return false;
             }
+        }
+    }
+
+    private class CopyAsyncTask extends AsyncTask {
+
+        File destination;
+
+        @Override
+        protected Object doInBackground(Object[] files) {
+            Message message1 = mHandler.obtainMessage(1);
+            message1.sendToTarget();
+            int totalSize = (int)Math.ceil(((File)files[0]).length() / 1024);
+            Message message3 = mHandler.obtainMessage(3, totalSize);
+            message3.sendToTarget();
+            try {
+                destination = (File)files[1];
+                copy((File) files[0], (File) files[1]);
+            } catch (Exception e) {
+                Message message2 = mHandler.obtainMessage(2);
+                message2.sendToTarget();
+                Toast.makeText(getApplicationContext(), "Problem with copying file", Toast.LENGTH_LONG).show();
+            }
+            return null;
+        }
+
+        private void copy(File src, File dst) throws IOException {
+            InputStream in = new FileInputStream(src);
+            OutputStream out = new FileOutputStream(dst, false);
+
+            byte[] buf = new byte[1024];
+            int len;
+            int soFar = 0;
+            while ((len = in.read(buf)) > 0) {
+                out.write(buf, 0, len);
+                Message message = mHandler.obtainMessage(4, soFar++);
+                message.sendToTarget();
+            }
+            in.close();
+            out.close();
+        }
+
+        @Override
+        protected void onPostExecute(Object o) {
+            Message message = mHandler.obtainMessage(2);
+            message.sendToTarget();
+            fileCopyFinished(destination);
         }
     }
 }

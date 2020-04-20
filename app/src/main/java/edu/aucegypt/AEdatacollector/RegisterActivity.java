@@ -4,25 +4,20 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
-
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
-
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
-
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.View;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
+
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
 
 public class RegisterActivity extends AppCompatActivity {
 
@@ -74,7 +69,7 @@ public class RegisterActivity extends AppCompatActivity {
         String ageGroup = ((RadioButton)findViewById(((RadioGroup)findViewById(R.id.ageGroupRG)).getCheckedRadioButtonId())).getText().toString();
 
         final SharedPreferences sharedPreferences = getSharedPreferences(getString(R.string.sharedPreferencesFile), Context.MODE_PRIVATE);
-        SQLiteDatabase db = (new DatabaseHelper(getApplicationContext())).getWritableDatabase();
+        SQLiteDatabase db = (new DatabaseHelper(RegisterActivity.this)).getWritableDatabase();
 
         insertIntoUserData(db, "name", sharedPreferences.getString(getString(R.string.consentName),""));
         insertIntoUserData(db, "consentDate", sharedPreferences.getLong(getString(R.string.consentDate),-1)+"");

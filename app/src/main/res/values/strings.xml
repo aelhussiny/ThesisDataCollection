@@ -46,4 +46,6 @@
     <string name="never">Never</string>
     <string name="thanks">Thank you for supporting my research</string>
     <string name="share_database">Share Database</string>
+    <string name="monitoring">Monitoring Sensors</string>
+    <string name="startingMonitoring">Starting Sensor Monitoring Services</string>
 </resources>

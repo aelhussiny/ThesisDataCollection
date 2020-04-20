@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:allowBackup="true"
@@ -14,25 +16,9 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <service
-            android:name=".GyroscopeService"
+            android:name=".SensorService"
             android:enabled="true"
             android:exported="true"></service>
-        <service
-            android:name=".AccelerometerService"
-            android:enabled="true"
-            android:exported="true" />
-        <service
-            android:name=".LightService"
-            android:enabled="true"
-            android:exported="true" />
-        <service
-            android:name=".StationaryService"
-            android:enabled="true"
-            android:exported="true" />
-        <service
-            android:name=".SigMotionService"
-            android:enabled="true"
-            android:exported="true" />
 
         <activity
             android:name=".MainActivity"
@@ -52,19 +38,34 @@
             android:name=".ConsentActivity"
             android:label="@string/title_activity_consent"
             android:theme="@style/AppTheme.NoActionBar" />
+
         <receiver
-            android:name=".BootReceiver" android:enabled="true" android:exported="true">
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </receiver>
         <receiver
-            android:name=".Restarter" android:enabled="true" android:exported="true">
+            android:name=".Restarter"
+            android:enabled="true"
+            android:exported="true">
             <intent-filter>
                 <action android:name="restartservice" />
             </intent-filter>
         </receiver>
+        <provider
+            android:name=".GenericFileProvider"
+            android:authorities="${applicationId}.provider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/provider_paths"/>
+        </provider>
     </application>
 
 </manifest>
